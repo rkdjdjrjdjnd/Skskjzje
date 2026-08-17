@@ -1,0 +1,381 @@
+-- DroneFront PRO v13.0 (полный код с загрузочным экраном)
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local camera = workspace.CurrentCamera
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+
+-- СОЗДАЁМ GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DroneFrontPRO"
+screenGui.Parent = player.PlayerGui
+screenGui.ResetOnSpawn = false
+
+-- ТЕКСТ ЗАГРУЗКИ ПО ЦЕНТРУ
+local loadingText = Instance.new("TextLabel")
+loadingText.Name = "LoadingText"
+loadingText.Size = UDim2.new(0, 400, 0, 120)
+loadingText.Position = UDim2.new(0.5, -200, 0.5, -60)
+loadingText.BackgroundTransparency = 1
+loadingText.Text = "ЗАГРУЗКА СКРИПТА...\nПОДОЖДИТЕ"
+loadingText.TextColor3 = Color3.fromRGB(0, 255, 100)
+loadingText.TextScaled = true
+loadingText.Font = Enum.Font.GothamBold
+loadingText.TextWrapped = true
+loadingText.Parent = screenGui
+
+-- Уведомление
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "DroneFront PRO",
+    Text = "Загрузка...",
+    Duration = 2
+})
+
+-- ПАУЗА 3 СЕКУНДЫ (чтобы вы увидели текст)
+task.wait(3)
+
+-- УБИРАЕМ ТЕКСТ ЗАГРУЗКИ
+loadingText:Destroy()
+
+-- ОСНОВНЫЕ ПЕРЕМЕННЫЕ
+local espEnabled = false
+local aimbotEnabled = false
+local aimbotRadius = 50
+local aimbotRange = 300
+
+-- ИКОНКА (шестерёнка, 40x40)
+local iconButton = Instance.new("ImageButton")
+iconButton.Name = "IconButton"
+iconButton.Size = UDim2.new(0, 40, 0, 40)
+iconButton.Position = UDim2.new(0, 20, 0, 150)
+iconButton.Image = "rbxassetid://6031090971"
+iconButton.ImageColor3 = Color3.fromRGB(0, 200, 255)
+iconButton.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+iconButton.BackgroundTransparency = 0.2
+iconButton.BorderSizePixel = 2
+iconButton.BorderColor3 = Color3.fromRGB(0, 180, 255)
+iconButton.Parent = screenGui
+
+-- ОКНО (скрыто по умолчанию)
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 280, 0, 400)
+mainFrame.Position = UDim2.new(0, 100, 0, 80)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+mainFrame.BackgroundTransparency = 0.15
+mainFrame.BorderSizePixel = 2
+mainFrame.BorderColor3 = Color3.fromRGB(0, 180, 255)
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Visible = false
+mainFrame.Parent = screenGui
+
+-- КНОПКА ЗАКРЫТИЯ ОКНА (X)
+local closeButton = Instance.new("TextButton")
+closeButton.Name = "CloseButton"
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -35, 0, 5)
+closeButton.BackgroundColor3 = Color3.fromRGB(200, 30, 30)
+closeButton.Text = "X"
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.TextScaled = true
+closeButton.Font = Enum.Font.GothamBold
+closeButton.Parent = mainFrame
+
+closeButton.MouseButton1Click:Connect(function()
+    mainFrame.Visible = false
+end)
+
+-- ЗАГОЛОВОК ОКНА
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, 0, 0, 35)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "DRONEFRONT PRO"
+title.TextColor3 = Color3.fromRGB(0, 200, 255)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+
+-- КНОПКА ESP
+local espToggle = Instance.new("TextButton", mainFrame)
+espToggle.Size = UDim2.new(0.9, 0, 0, 35)
+espToggle.Position = UDim2.new(0.05, 0, 0, 45)
+espToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+espToggle.Text = "ESP: OFF"
+espToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+espToggle.TextScaled = true
+espToggle.Font = Enum.Font.GothamBold
+
+espToggle.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+    espToggle.Text = espEnabled and "ESP: ON" or "ESP: OFF"
+    espToggle.BackgroundColor3 = espEnabled and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(40, 40, 50)
+    if espEnabled then enableESP() else disableESP() end
+end)
+
+-- КНОПКА AIMBOT
+local aimToggle = Instance.new("TextButton", mainFrame)
+aimToggle.Size = UDim2.new(0.9, 0, 0, 35)
+aimToggle.Position = UDim2.new(0.05, 0, 0, 90)
+aimToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+aimToggle.Text = "AIMBOT: OFF"
+aimToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+aimToggle.TextScaled = true
+aimToggle.Font = Enum.Font.GothamBold
+
+aimToggle.MouseButton1Click:Connect(function()
+    aimbotEnabled = not aimbotEnabled
+    aimToggle.Text = aimbotEnabled and "AIMBOT: ON" or "AIMBOT: OFF"
+    aimToggle.BackgroundColor3 = aimbotEnabled and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(40, 40, 50)
+    showAimCircle(aimbotEnabled)
+end)
+
+-- ПОЛЗУНОК РАЗМЕРА КРУГА
+local radiusLabel = Instance.new("TextLabel", mainFrame)
+radiusLabel.Size = UDim2.new(0.6, 0, 0, 25)
+radiusLabel.Position = UDim2.new(0.05, 0, 0, 135)
+radiusLabel.BackgroundTransparency = 1
+radiusLabel.Text = "CIRCLE: 50"
+radiusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+radiusLabel.TextScaled = true
+radiusLabel.Font = Enum.Font.Gotham
+
+local radiusSlider = Instance.new("Frame", mainFrame)
+radiusSlider.Size = UDim2.new(0.25, 0, 0, 10)
+radiusSlider.Position = UDim2.new(0.7, 0, 0, 142)
+radiusSlider.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+radiusSlider.BorderSizePixel = 0
+
+local radiusFill = Instance.new("Frame", radiusSlider)
+radiusFill.Size = UDim2.new(0.5, 0, 1, 0)
+radiusFill.Position = UDim2.new(0, 0, 0, 0)
+radiusFill.BackgroundColor3 = Color3.fromRGB(0, 180, 255)
+radiusFill.BorderSizePixel = 0
+
+local function updateRadius(value)
+    local clamped = math.clamp(value, 1, 100)
+    aimbotRadius = clamped
+    radiusFill.Size = UDim2.new(clamped / 100, 0, 1, 0)
+    radiusLabel.Text = "CIRCLE: " .. clamped
+end
+
+radiusSlider.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local drag
+        drag = RunService.RenderStepped:Connect(function()
+            local mouse = player:GetMouse()
+            local relX = math.clamp((mouse.X - radiusSlider.AbsolutePosition.X) / radiusSlider.AbsoluteSize.X, 0, 1)
+            updateRadius(math.round(relX * 100))
+        end)
+        input.UserInputType == Enum.UserInputType.MouseButton1 and drag:Disconnect() or nil
+    end
+end)
+
+-- ПОЛЗУНОК ДАЛЬНОСТИ (200-400 м)
+local rangeLabel = Instance.new("TextLabel", mainFrame)
+rangeLabel.Size = UDim2.new(0.6, 0, 0, 25)
+rangeLabel.Position = UDim2.new(0.05, 0, 0, 175)
+rangeLabel.BackgroundTransparency = 1
+rangeLabel.Text = "RANGE: 300m"
+rangeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+rangeLabel.TextScaled = true
+rangeLabel.Font = Enum.Font.Gotham
+
+local rangeSlider = Instance.new("Frame", mainFrame)
+rangeSlider.Size = UDim2.new(0.25, 0, 0, 10)
+rangeSlider.Position = UDim2.new(0.7, 0, 0, 182)
+rangeSlider.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+rangeSlider.BorderSizePixel = 0
+
+local rangeFill = Instance.new("Frame", rangeSlider)
+rangeFill.Size = UDim2.new(0.5, 0, 1, 0)
+rangeFill.Position = UDim2.new(0, 0, 0, 0)
+rangeFill.BackgroundColor3 = Color3.fromRGB(0, 220, 100)
+rangeFill.BorderSizePixel = 0
+
+local function updateRange(value)
+    local clamped = math.clamp(value, 200, 400)
+    aimbotRange = clamped
+    rangeFill.Size = UDim2.new((clamped - 200) / 200, 0, 1, 0)
+    rangeLabel.Text = "RANGE: " .. clamped .. "m"
+end
+
+rangeSlider.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local drag
+        drag = RunService.RenderStepped:Connect(function()
+            local mouse = player:GetMouse()
+            local relX = math.clamp((mouse.X - rangeSlider.AbsolutePosition.X) / rangeSlider.AbsoluteSize.X, 0, 1)
+            updateRange(math.round(200 + relX * 200))
+        end)
+        input.UserInputType == Enum.UserInputType.MouseButton1 and drag:Disconnect() or nil
+    end
+end)
+
+-- КРУГ ПРИЦЕЛА (отображается при включённом аимботе)
+local aimCircle = Instance.new("ImageLabel", screenGui)
+aimCircle.Size = UDim2.new(0, aimbotRadius * 2, 0, aimbotRadius * 2)
+aimCircle.Position = UDim2.new(0.5, -aimbotRadius, 0.5, -aimbotRadius)
+aimCircle.Image = "rbxassetid://150630365"
+aimCircle.ImageColor3 = Color3.fromRGB(0, 200, 255)
+aimCircle.BackgroundTransparency = 1
+aimCircle.Visible = false
+aimCircle.ZIndex = 999
+
+local function showAimCircle(show)
+    aimCircle.Visible = show and aimbotEnabled
+end
+
+RunService.Heartbeat:Connect(function()
+    if aimbotEnabled then
+        aimCircle.Size = UDim2.new(0, aimbotRadius * 2, 0, aimbotRadius * 2)
+        aimCircle.Position = UDim2.new(0.5, -aimbotRadius, 0.5, -aimbotRadius)
+    end
+end)
+
+-- ===== ФУНКЦИИ ESP =====
+local espObjects = {}
+
+function enableESP()
+    for _, p in pairs(Players:GetChildren()) do
+        if p ~= player and p.Character then
+            createESP(p)
+        end
+    end
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("Model") and (v.Name:lower():find("drone") or v.Name:lower():find("turret") or v.Name:lower():find("aa") or v.Name:lower():find("zenit")) then
+            createESPForObject(v)
+        end
+    end
+end
+
+function disableESP()
+    for _, obj in pairs(espObjects) do
+        obj:Destroy()
+    end
+    espObjects = {}
+end
+
+function createESP(target)
+    if not target.Character then return end
+    local head = target.Character:FindFirstChild("Head")
+    if not head then return end
+
+    local bill = Instance.new("BillboardGui")
+    bill.Name = "ESP_" .. target.Name
+    bill.Size = UDim2.new(0, 200, 0, 50)
+    bill.Adornee = head
+    bill.AlwaysOnTop = true
+    bill.MaxDistance = aimbotRange
+    bill.Parent = head
+    table.insert(espObjects, bill)
+
+    local label = Instance.new("TextLabel", bill)
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = target.Name .. " | " .. string.format("%.0fm", (head.Position - character.HumanoidRootPart.Position).Magnitude)
+    label.TextColor3 = Color3.fromRGB(0, 200, 255)
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+end
+
+function createESPForObject(obj)
+    local pos = obj:FindFirstChild("PrimaryPart") or obj:FindFirstChild("Head") or obj:FindFirstChild("HumanoidRootPart")
+    if not pos then return end
+
+    local bill = Instance.new("BillboardGui")
+    bill.Name = "ESP_" .. obj.Name
+    bill.Size = UDim2.new(0, 150, 0, 30)
+    bill.Adornee = pos
+    bill.AlwaysOnTop = true
+    bill.MaxDistance = aimbotRange
+    bill.Parent = pos
+    table.insert(espObjects, bill)
+
+    local label = Instance.new("TextLabel", bill)
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = obj.Name .. " | " .. string.format("%.0fm", (pos.Position - character.HumanoidRootPart.Position).Magnitude)
+    label.TextColor3 = Color3.fromRGB(255, 100, 0)
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+end
+
+-- ===== АВТО-СПОТИНГ =====
+local spottedTargets = {}
+
+function autoSpot()
+    for _, p in pairs(Players:GetChildren()) do
+        if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local root = p.Character.HumanoidRootPart
+            local dist = (root.Position - character.HumanoidRootPart.Position).Magnitude
+            if dist <= aimbotRange then
+                if not spottedTargets[p] then
+                    spottedTargets[p] = true
+                    game:GetService("ReplicatedStorage").Events.SpotTarget:FireServer(p)
+                end
+            else
+                spottedTargets[p] = nil
+            end
+        end
+    end
+end
+
+-- ===== AIMBOT =====
+function getClosestInCircle()
+    local closest = nil
+    local closestDist = math.huge
+    local mouse = player:GetMouse()
+    local center = Vector2.new(mouse.X, mouse.Y)
+
+    for _, p in pairs(Players:GetChildren()) do
+        if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local root = p.Character.HumanoidRootPart
+            local screenPos, onScreen = camera:WorldToScreenPoint(root.Position)
+            if onScreen then
+                local dist2D = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                local dist3D = (root.Position - character.HumanoidRootPart.Position).Magnitude
+                if dist2D <= aimbotRadius and dist3D <= aimbotRange and dist3D < closestDist then
+                    closest = p
+                    closestDist = dist3D
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- ===== ОБРАБОТЧИКИ =====
+-- Иконка: показать/скрыть окно
+iconButton.MouseButton1Click:Connect(function()
+    mainFrame.Visible = not mainFrame.Visible
+end)
+
+-- Авто-спотинг (фоном)
+RunService.Heartbeat:Connect(function()
+    if espEnabled then
+        autoSpot()
+    end
+end)
+
+-- Аимбот (по зажатию E)
+RunService.RenderStepped:Connect(function()
+    if not aimbotEnabled then return end
+    if not UIS:IsKeyDown(Enum.KeyCode.E) then return end
+
+    local target = getClosestInCircle()
+    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        local targetRoot = target.Character.HumanoidRootPart
+        camera.CFrame = CFrame.new(camera.CFrame.Position, targetRoot.Position + Vector3.new(0, 1.5, 0))
+    end
+end)
+
+-- ФИНАЛЬНОЕ УВЕДОМЛЕНИЕ
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "DroneFront PRO",
+    Text = "Готово! Нажмите на шестерёнку.",
+    Duration = 3
+})
+
+print(" DroneFront PRO загружен, господин.")
